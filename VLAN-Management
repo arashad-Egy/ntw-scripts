@@ -1,0 +1,88 @@
+from netmiko import ConnectHandler
+
+# Function to establish SSH connection to a Cisco device
+def connect_to_device(device):
+    connection = {
+        'device_type': 'cisco_ios',
+        'ip': device['ip'],
+        'username': device['username'],
+        'password': device['password'],
+    }
+
+    try:
+        # Establish SSH connection
+        net_connect = ConnectHandler(**connection)
+        return net_connect
+    except Exception as e:
+        print(f"Error connecting to {device['name']} - {str(e)}")
+        return None
+
+
+# Function to create a VLAN on a Cisco device
+def create_vlan(net_connect, vlan_id, vlan_name):
+    config_commands = [
+        f'vlan {vlan_id}',
+        f'name {vlan_name}',
+    ]
+    output = net_connect.send_config_set(config_commands)
+    print(output)
+
+
+# Function to configure access to a specific destination IP and port
+def configure_access(net_connect, vlan_id, destination_ip, destination_port):
+    access_config = [
+        f'access-list {vlan_id} permit ip any {destination_ip} {destination_port}',
+        f'interface vlan {vlan_id}',
+        'ip access-group {} in'.format(vlan_id),
+    ]
+    output = net_connect.send_config_set(access_config)
+    print(output)
+
+
+# Function to add user ports to a VLAN
+def add_ports_to_vlan(net_connect, vlan_id, ports):
+    interface_config = []
+    for port in ports:
+        interface_config.append(f'interface {port}')
+        interface_config.append(f'switchport mode access')
+        interface_config.append(f'switchport access vlan {vlan_id}')
+
+    output = net_connect.send_config_set(interface_config)
+    print(output)
+
+
+# Main function to perform VLAN creation, access configuration, and port addition
+def main():
+    device = {
+        'name': 'Device 1',
+        'ip': '192.168.0.1',
+        'username': 'your_username',
+        'password': 'your_password',
+    }
+
+    # Connect to the device
+    net_connect = connect_to_device(device)
+    if not net_connect:
+        return
+
+    # Create VLAN
+    vlan_id = 10
+    vlan_name = 'VLAN10'
+    create_vlan(net_connect, vlan_id, vlan_name)
+
+    # Configure access to a specific destination IP and port
+    destination_ip = '192.168.1.100'
+    destination_port = '80'
+    configure_access(net_connect, vlan_id, destination_ip, destination_port)
+
+    # Add user ports to the VLAN
+    ports = ['GigabitEthernet0/1', 'GigabitEthernet0/2']
+    add_ports_to_vlan(net_connect, vlan_id, ports)
+
+    # Disconnect from the device
+    net_connect.disconnect()
+
+
+# Run the main function
+if __name__ == '__main__':
+    main()
